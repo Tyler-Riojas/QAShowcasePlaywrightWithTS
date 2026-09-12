@@ -1,0 +1,156 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-chromium:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npx playwright test --project=chromium
+        env:
+          CI: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-results-chromium
+          path: allure-results/
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-chromium
+          path: playwright-report/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-chromium
+          path: test-results/junit.xml
+          retention-days: 7
+
+  test-firefox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install firefox --with-deps
+      - run: npx playwright test --project=firefox
+        env:
+          CI: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-results-firefox
+          path: allure-results/
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-firefox
+          path: playwright-report/
+          retention-days: 7
+
+  test-webkit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install webkit --with-deps
+      - run: npx playwright test --project=webkit
+        env:
+          CI: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-results-webkit
+          path: allure-results/
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-webkit
+          path: playwright-report/
+          retention-days: 7
+
+  test-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright test --project=api
+        env:
+          CI: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-results-api
+          path: allure-results/
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-api
+          path: test-results/junit.xml
+          retention-days: 7
+
+  allure-report:
+    runs-on: ubuntu-latest
+    needs: [test-chromium, test-firefox, test-webkit, test-api]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: allure-results-chromium
+          path: allure-results/
+      - uses: actions/download-artifact@v4
+        with:
+          name: allure-results-firefox
+          path: allure-results/
+      - uses: actions/download-artifact@v4
+        with:
+          name: allure-results-webkit
+          path: allure-results/
+      - uses: actions/download-artifact@v4
+        with:
+          name: allure-results-api
+          path: allure-results/
+
+      - name: Generate Allure report
+        run: npx allure generate allure-results --clean -o allure-report
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: allure-report
